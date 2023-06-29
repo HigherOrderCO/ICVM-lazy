@@ -44,13 +44,13 @@ pub fn new_inet() -> INet {
 }
 
 // Allocates a new node, reclaiming a freed space if possible.
-pub fn new_node(inet: &mut INet, kind: u32) -> u32 {
-  let node : u32 = match inet.reuse.pop() {
+pub fn new_node(inet: &mut INet, kind: NodeKind) -> NodeId {
+  let node: NodeId = match inet.reuse.pop() {
     Some(index) => index,
     None => {
       let len = inet.nodes.len();
       inet.nodes.resize(len + 4, 0);
-      (len as u32) / 4
+      (len as Port) / 4
     }
   };
   inet.nodes[port(node, 0) as usize] = port(node, 0);

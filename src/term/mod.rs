@@ -11,7 +11,7 @@ pub use self::syntax::*;
 pub use self::views::*;
 
 use std::collections::*;
-use inet::*;
+use crate::inet::*;
 use std;
 
 // Terms of the Interaction Calculus.

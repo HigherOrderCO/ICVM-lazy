@@ -5,7 +5,7 @@
 
 mod core;
 mod equal;
-mod parallel;
+// mod parallel;
 mod syntax;
 
 pub use self::core::*;

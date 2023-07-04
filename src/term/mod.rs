@@ -220,6 +220,7 @@ pub fn index_to_name(idx : u32) -> Vec<Chr> {
 
 // Converts a name to an index
 pub fn name_to_index(name : &Vec<Chr>) -> u32 {
+  println!("{}", std::str::from_utf8(name).unwrap());
   let mut idx : u32 = 0;
   for byte in name.iter().rev() {
     idx = (idx * 26) + (*byte as u32 - 97) + 1;

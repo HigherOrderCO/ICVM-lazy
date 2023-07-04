@@ -5,9 +5,6 @@
 #![allow(unused_variables)]
 #![allow(unreachable_code)]
 
-extern crate ic;
-extern crate clap;
-
 use clap::{Arg, App};
 use ic::*;
 use std::io;

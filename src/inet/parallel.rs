@@ -1,5 +1,6 @@
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::{sync::{atomic::{AtomicU32, Ordering}, RwLock}, ops::{Index, IndexMut}};
 use crate::term::definition_book::DefinitionBook;
+use flume::{Sender, unbounded, Receiver};
 use rayon::{prelude::*, Scope};
 use super::{NodeId, ROOT, port, Port, slot, addr, NodeKind, TAG_MASK, REF};
 
@@ -9,16 +10,65 @@ pub type ActiveNodePair = (NodeId, NodeId);
 
 pub type ActiveNodePairs = Vec<ActiveNodePair>;
 
-const UNUSED_NODE: u32 = u32::MAX;
+type Cell = u32;
 
-type Node = AtomicU32;
+const UNUSED_CELL: Cell = Cell::MAX;
+
+const CELLS_PER_NODE: usize = 4;
 
 #[derive(Debug)]
+struct Node([Cell; CELLS_PER_NODE]);
+
+type Foo = RwLock<Node>;
+
+// Parallel interaction combinator net reduction
+#[derive(Debug)]
 pub struct ParINet {
-  nodes: Vec<Node>,
+  nodes: Box<[RwLock<Node>]>,
+  tx_free_nodes: Sender<NodeId>,
+  rx_free_nodes: Receiver<NodeId>,
 }
 
 impl ParINet {
+  // Create a new net, with a deadlocked root node.
+  pub fn new() -> Self {
+    let (tx_free_nodes, rx_free_nodes) = unbounded();
+    // p2 points to p0, p1 points to net
+    Self {
+      nodes: vec![2,1,0,0],
+      tx_free_nodes,
+      rx_free_nodes,
+    }
+  }
+
+  // Allocates a new node, reclaiming a freed space if possible.
+  pub fn new_node(&self, kind: NodeKind) -> NodeId {
+    let node_id = self.rx_free_nodes.recv().unwrap();
+
+    debug_assert_eq!(self.nodes[port(node_id, 0) as usize].load(Ordering::SeqCst), UNUSED_CELL);
+    debug_assert_eq!(self.nodes[port(node_id, 1) as usize].load(Ordering::SeqCst), UNUSED_CELL);
+    debug_assert_eq!(self.nodes[port(node_id, 2) as usize].load(Ordering::SeqCst), UNUSED_CELL);
+    debug_assert_eq!(self.nodes[port(node_id, 3) as usize].load(Ordering::SeqCst), UNUSED_CELL);
+
+    self.nodes[port(node_id, 0) as usize].store(port(node_id, 0), Ordering::SeqCst);
+    self.nodes[port(node_id, 1) as usize].store(port(node_id, 1), Ordering::SeqCst);
+    self.nodes[port(node_id, 2) as usize].store(port(node_id, 2), Ordering::SeqCst);
+    self.nodes[port(node_id, 3) as usize].store(kind, Ordering::SeqCst);
+
+    node_id
+  }
+
+  fn free_node(&self, node_id: NodeId) {
+    self.nodes[node_id as usize].write();
+    self.tx_free_nodes.send(node_id).unwrap();
+  }
+
+  // Links two ports.
+  fn link(&self, ptr_a: Port, ptr_b: Port) {
+    self.nodes[ptr_a as usize].store(ptr_b, Ordering::SeqCst);
+    self.nodes[ptr_b as usize].store(ptr_a, Ordering::SeqCst);
+  }
+
   // Enters a port, returning the port on the other side.
   pub fn enter(&self, port: Port) -> Port {
     self.nodes[port as usize].load(Ordering::SeqCst)
@@ -40,7 +90,7 @@ impl ParINet {
   pub fn scan_active_pairs(&self) -> ActiveNodePairs {
     let mut active_pairs = vec![];
     for (node_id, node) in self.nodes.iter().enumerate() {
-      if node.load(Ordering::SeqCst) == UNUSED_NODE {
+      if node.load(Ordering::SeqCst) == UNUSED_CELL {
         continue;
       }
 
@@ -76,37 +126,6 @@ impl ParINet {
         });
       }
     });
-  }
-
-  // Links two ports.
-  fn link(&self, ptr_a: Port, ptr_b: Port) {
-    self.nodes[ptr_a as usize].store(ptr_b, Ordering::SeqCst);
-    self.nodes[ptr_b as usize].store(ptr_a, Ordering::SeqCst);
-  }
-
-  // Allocates a new node, reclaiming a freed space if possible.
-  pub fn new_node(&self, kind: NodeKind) -> NodeId {
-    const MEM_CELLS_PER_NODE: usize = 4;
-    let node_id = self.nodes.iter().step_by(MEM_CELLS_PER_NODE).position(|port_0| port_0.load(Ordering::SeqCst) == UNUSED_NODE).unwrap() as NodeId;
-
-    debug_assert_eq!(self.nodes[port(node_id, 0) as usize].load(Ordering::SeqCst), UNUSED_NODE);
-    debug_assert_eq!(self.nodes[port(node_id, 1) as usize].load(Ordering::SeqCst), UNUSED_NODE);
-    debug_assert_eq!(self.nodes[port(node_id, 2) as usize].load(Ordering::SeqCst), UNUSED_NODE);
-    debug_assert_eq!(self.nodes[port(node_id, 3) as usize].load(Ordering::SeqCst), UNUSED_NODE);
-
-    self.nodes[port(node_id, 0) as usize].store(port(node_id, 0), Ordering::SeqCst);
-    self.nodes[port(node_id, 1) as usize].store(port(node_id, 1), Ordering::SeqCst);
-    self.nodes[port(node_id, 2) as usize].store(port(node_id, 2), Ordering::SeqCst);
-    self.nodes[port(node_id, 3) as usize].store(kind, Ordering::SeqCst);
-
-    node_id
-  }
-
-  fn free_node(&self, node_id: NodeId) {
-    self.nodes[port(node_id, 0) as usize].store(UNUSED_NODE, Ordering::SeqCst);
-    self.nodes[port(node_id, 1) as usize].store(UNUSED_NODE, Ordering::SeqCst);
-    self.nodes[port(node_id, 2) as usize].store(UNUSED_NODE, Ordering::SeqCst);
-    self.nodes[port(node_id, 3) as usize].store(UNUSED_NODE, Ordering::SeqCst);
   }
 
   // fn rewrite(&self, active_pair: ActiveNodePair, definition_book: &DefinitionBook) -> ActiveNodePairs {

@@ -12,9 +12,13 @@ name = "ic"
 path = "src/lib.rs"
 
 [dependencies]
+boxcar = "0.1.0"
 clap = "2.26.0"
+flume = "0.10.14"
 itertools = "0.10.5"
+parking_lot = "0.12.1"
 rayon = "1.7.0"
+thread_local = "1.1.7"
 
 [[bin]]
 name = "ic"

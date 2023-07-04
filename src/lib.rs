@@ -3,8 +3,5 @@
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 
-extern crate itertools;
-extern crate rayon;
-
 pub mod term;
 pub mod inet;

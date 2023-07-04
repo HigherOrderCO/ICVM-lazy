@@ -98,6 +98,7 @@ pub fn link(inet: &mut INet, ptr_a: Port, ptr_b: Port) {
 
 // Reduces a wire to weak normal form.
 pub fn reduce(inet: &mut INet, root: Port, skip: &dyn Fn(NodeKind, NodeKind) -> bool, definition_book: &DefinitionBook) {
+  // println!("S: {}", crate::term::from_net(&inet, definition_book));
   let mut path = vec![];
   let mut prev = root;
   loop {
@@ -117,6 +118,7 @@ pub fn reduce(inet: &mut INet, root: Port, skip: &dyn Fn(NodeKind, NodeKind) -> 
           // We need to overwrite `next` because the target node of the active pair was replaced.
           next = new_next;
         } else {
+          println!("{}", crate::term::from_net(&inet, definition_book));
           inet.rules += 1;
           prev = path.pop().unwrap();
           continue;
@@ -134,16 +136,22 @@ pub fn reduce(inet: &mut INet, root: Port, skip: &dyn Fn(NodeKind, NodeKind) -> 
 
 // Reduces the net to normal form.
 pub fn normal(inet: &mut INet, root: Port, definition_book: &DefinitionBook) {
-  let mut warp = vec![root];
+  let mut warp = vec![(root, 0)];
   let mut tick = 0;
-  while let Some(prev) = warp.pop() {
+  let mut max_generation = 0;
+  let mut rewrites = vec![];
+  while let Some((prev, generation)) = warp.pop() {
+    max_generation = max_generation.max(generation);
     reduce(inet, prev, &|ak,bk| false, definition_book);
+    rewrites.push(inet.rules - rewrites.last().copied().unwrap_or(0));
     let next = enter(inet, prev);
     if slot(next) == 0 {
-      warp.push(port(addr(next), 1));
-      warp.push(port(addr(next), 2));
+      let gen = generation + 1;
+      warp.push((port(addr(next), 1), gen));
+      warp.push((port(addr(next), 2), gen));
     }
   }
+  println!("max_gen: {max_generation}, rewrites: {rewrites:?}");
 }
 
 /// Rewrites an active pair.

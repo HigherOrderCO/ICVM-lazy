@@ -240,7 +240,7 @@ pub fn to_string(term : &Term) -> Vec<Chr> {
   fn stringify_term(code : &mut Vec<u8>, term : &Term) {
     match term {
       &Lam{ref nam, ref typ, ref bod} => {
-        code.extend_from_slice("λ".as_bytes());
+        code.extend_from_slice("\\".as_bytes());
         if let Some(ref t) = typ {
           code.extend_from_slice(b"(");
           code.append(&mut nam.clone());

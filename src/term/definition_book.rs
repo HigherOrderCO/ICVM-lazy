@@ -46,7 +46,7 @@ impl DefinitionBook {
   }
 
   pub fn contains(&self, name: &str) -> bool {
-    self.definition_name_to_id.keys().any(|n| n == name)
+    self.definition_name_to_id.contains_key(name)
   }
 
   pub fn add_definition(&mut self, name: DefinitionName, term: Term) {

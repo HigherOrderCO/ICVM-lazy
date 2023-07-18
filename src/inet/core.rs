@@ -21,6 +21,7 @@ pub const ANN : NodeKind = 2 << TAG;
 pub const DUP : NodeKind = 3 << TAG;
 pub const FIX : NodeKind = 4 << TAG;
 pub const REF : NodeKind = 5 << TAG;
+pub const READ: NodeKind = 6 << TAG;
 
 pub const LABEL_MASK: NodeKind = ((1 << TAG) - 1);
 pub const TAG_MASK: NodeKind = !LABEL_MASK;
@@ -164,7 +165,7 @@ pub fn rewrite(inet: &mut INet, x: NodeId, y: NodeId, definition_book: &Definiti
   ) -> NodeId {
     inet.reuse.push(ref_node); // Remove REF node
 
-    let definition_id = (ref_kind - REF) as usize;
+    let definition_id = (ref_kind & LABEL_MASK) as usize;
     let definition_data = &definition_book.definition_id_to_data[definition_id];
     let host = port(other_node, 0);
     debug_assert_eq!(enter(inet, host), port(ref_node, 0));

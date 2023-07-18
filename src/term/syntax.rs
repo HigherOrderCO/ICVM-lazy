@@ -126,7 +126,7 @@ pub fn parse_term<'a>(code: &'a Str, ctx: &mut Context<'a>, idx: &mut u32, defin
       (code, Lam { nam, typ, bod })
     }
     // Untyped Abstraction: `\var body`
-    b'\\' => { 
+    b'\\' => {
       let (code, nam) = parse_name(&code[1..]);
       extend(nam, None, ctx);
       let (code, bod) = parse_term(code, ctx, idx, definitions);
@@ -268,15 +268,15 @@ pub fn to_string(term : &Term) -> Vec<Chr> {
         code.extend_from_slice(b">");
       },
       &Sup{tag, ref fst, ref snd} => {
-        code.extend_from_slice(b"[");
+        code.extend_from_slice(b"{");
         stringify_term(code, &fst);
-        code.extend_from_slice(b" ");
+        code.extend_from_slice(b", ");
         stringify_term(code, &snd);
+        code.extend_from_slice(b"}");
         if tag != 0 {
           code.extend_from_slice(b"#");
           code.append(&mut index_to_name(tag));
         }
-        code.extend_from_slice(b"]");
       },
       &Dup{tag, ref fst, ref snd, ref val, ref nxt} => {
         code.extend_from_slice(b"dup ");

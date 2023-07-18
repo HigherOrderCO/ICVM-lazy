@@ -162,7 +162,7 @@ pub fn alloc_at(inet: &mut INet, term: &Term, host: Port, definition_name_to_id:
       None => {
         let name = std::str::from_utf8(nam).unwrap();
         if let Some(definition_id) = definition_name_to_id.get(name) {
-          let node = new_node(inet, REF + definition_id);
+          let node = new_node(inet, REF | definition_id);
           link(inet, port(node, 1), port(node, 2));
           link(inet, var, port(node, 0));
         } else {
@@ -288,7 +288,7 @@ pub fn read_at(net: &INet, host: Port, definition_book: &DefinitionBook) -> Term
           let nam = name_of(net, port(addr(next), 1), var_name);
           let prt = enter(net, port(addr(next), 0));
           let bod = reader(net, prt, var_name, dups_vec, dups_set, seen, definition_book);
-          Fix { nam: nam, bod: Box::new(bod) }
+          Fix { nam, bod: Box::new(bod) }
         },
         // If we're visiting a port 1, then it is a fixed point occurrence.
         1 => {
@@ -299,8 +299,12 @@ pub fn read_at(net: &INet, host: Port, definition_book: &DefinitionBook) -> Term
           Var { nam: b"^".to_vec() }
         }
       },
+      tag if tag & TAG_MASK == READ => {
+        let read_node_label = (tag & LABEL_MASK) as usize;
+        Var { nam: format!("READ#{read_node_label}").as_bytes().to_vec() }
+      }
       tag if tag & TAG_MASK == REF => {
-        let definition_id = (tag - REF) as usize;
+        let definition_id = (tag & LABEL_MASK) as usize;
         let definition_data = &definition_book.definition_id_to_data[definition_id];
         let name = &definition_data.name;
         if name.starts_with(EXTRACTED_DEFINITION_PREFIX) {

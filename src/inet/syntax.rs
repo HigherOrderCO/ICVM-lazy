@@ -145,6 +145,7 @@ pub fn inet_to_inodes(inet: &INet) -> INodes {
     let node = i as u32;
     let k = kind(inet, node);
     // if k != 0 {
+    if !inet.reuse.contains(&node) {
       let mut ports = [String::new(), String::new(), String::new()];
       for j in 0..3 {
         let p = port(node, j);
@@ -164,7 +165,7 @@ pub fn inet_to_inodes(inet: &INet) -> INodes {
         label: k,
         ports,
       });
-    // }
+    }
   }
 
   inodes

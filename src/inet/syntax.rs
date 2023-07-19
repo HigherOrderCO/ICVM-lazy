@@ -63,7 +63,7 @@ fn parse_node<'a>(code: &'a Str) -> Result<(&'a Str, INode), String> {
 
   let (code, label) = parse_name(code);
   let label = String::from_utf8_lossy(label).parse::<u32>().unwrap_or(CON);
-  let label = if label == CON { CON } else { DUP + label };
+  // let label = if label == CON { CON } else { DUP + label };
 
   Ok((code, INode {
     label,
@@ -148,7 +148,7 @@ pub fn inet_to_inodes(inet: &INet) -> INodes {
       let mut ports = [String::new(), String::new(), String::new()];
       for j in 0..3 {
         let p = port(node, j);
-        if enter(inet, p) == ROOT { 
+        if enter(inet, p) == ROOT {
           ports[j as usize] = "_".to_string();
         } else {
           if names[p as usize].is_empty() {

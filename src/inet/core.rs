@@ -1,7 +1,8 @@
 // Implements Interaction Combinators. The Interaction Calculus is directly isomorphic to them, so,
 // to reduce a term, we simply translate to interaction combinators, reduce, then translate back.
 
-use crate::term::{definition_book::DefinitionBook, alloc_at, read_at};
+use itertools::Itertools;
+use crate::term::definition_book::DefinitionBook;
 pub use super::*;
 
 #[derive(Clone, Debug)]
@@ -169,9 +170,7 @@ pub fn rewrite(inet: &mut INet, x: NodeId, y: NodeId, definition_book: &Definiti
     let definition_data = &definition_book.definition_id_to_data[definition_id];
     let host = port(other_node, 0);
     debug_assert_eq!(enter(inet, host), port(ref_node, 0));
-    // TODO: Instead of calling `alloc_at`, insert nodes from precomputed `definition_data.net`.
-    // and map node indices correctly (new node indices aren't necessarily contiguous).
-    alloc_at(inet, &definition_data.term, host, &definition_book.definition_name_to_id);
+    insert_net(inet, &definition_data.net, host);
 
     addr(enter(inet, host)) // Return ID of new node facing `other_node`
   }
@@ -237,3 +236,37 @@ pub fn rewrite(inet: &mut INet, x: NodeId, y: NodeId, definition_book: &Definiti
   None
 }
 
+/// Insert a subnet into the mainnet and link it to the given `host`.
+/// Used by [`expand_ref_node`] to insert a DEF's net.
+fn insert_net<'a>(mainnet: &mut INet, subnet: &'a INet, host: Port) {
+  // Skip root node, so len == subnet.nodes.len() - 1
+  let iter_nodes = |net: &'a INet| net.nodes.chunks(4).into_iter().skip(1);
+
+  let subnet_id_to_main_id : Vec<NodeId> = iter_nodes(subnet)
+    .map(|node| new_node(mainnet, node[3]))
+    .collect();
+
+  for (subnet_node, &from_node_main) in iter_nodes(subnet).zip(subnet_id_to_main_id.iter()) {
+    // Link the 3 ports of the node
+    for from_slot in [0 as u32, 1, 2] {
+      // In subnet, from_port_sub was linked to to_port_sub
+      // In mainnet, this is equivalent to from_port_net being linked to to_port_net
+      let to_port_sub = subnet_node[from_slot as usize];
+      if to_port_sub == ROOT {
+        // A link to root becomes a link to host
+        link(mainnet, port(from_node_main, from_slot), host);
+      } else {
+        // All other links are internal to the subnet
+        let to_slot = slot(to_port_sub);
+        let to_node_sub = addr(to_port_sub);
+        let to_node_main = subnet_id_to_main_id[(to_node_sub - 1) as usize]; // -1 since we skipped root
+        let to_port_main = port(to_node_main, to_slot);
+        mainnet.nodes[port(from_node_main, from_slot) as usize] = to_port_main; // One side of the link only
+      }
+    }
+    // Copy the node kind
+    // This generates the same DUP labels every time, which may also be overlapping with existing nodes of the net.
+    // This can cause some unexpected outcomes but is the same behaviour as when converting from a term.
+    mainnet.nodes[port(from_node_main, 3) as usize] = subnet_node[3];
+  }
+}
